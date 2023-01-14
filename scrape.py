@@ -3,6 +3,21 @@ import streamlit as st
 import re
 import PyPDF2
 import pandas as pd
+import numpy as np
+import seaborn as sns
+import altair as alt
+
+#NLP library
+import neattext.functions as nfx
+import joblib
+
+# ML libraries
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.pipeline import Pipeline
 
 #set website link a name
 st.set_page_config(page_title="Tobibui1904",layout="wide")
@@ -11,6 +26,7 @@ st.set_page_config(page_title="Tobibui1904",layout="wide")
 header=st.container()
 converter = st.container()
 searching = st.container()
+comment = st.container()
 
 #Introduction about the program
 with header:
@@ -20,18 +36,20 @@ with header:
     st.subheader('1: Project Purposes')
     st.markdown("""The objective of my project is to make Ctrl F more convenient and funnier. For those who have to deal with a large data of PDFs ore many webpages whose information needed to be found easily,
                 my program is for you. It's like a summary version of Ctrl F into a table. With this, you can look for information easily without scrolling down to multiple places and process with various sentences with unnecsary information.
-                This table also filters out number appearances if you're looking for a statistics for your research or project. I believe this tool would play an important role to help your life easier. 
+                This table also filters out number appearances if you're looking for a statistics for your research or project. Finally, you can leave your comment at the bottom of the program, and let my NLP application handle it. I believe this tool would play an important role to help your life easier. 
 """)
     st.subheader('2: How it works')
     st.markdown("""- Step 1: If you have your own PDF files, upload it to the program. One note is that you can upload multiple files. Otherwise, if you want to search for something online, paste the link to the input bar. """)
     st.markdown("""- Step 2: And then put your search term to the bar.""")
     st.markdown("""- Step 3: Waiting for the results.""")
+    st.markdown("""- Step 4 (Optional): You can leave your comment below and witness the magic of NLP.""")
     st.subheader('3: Features')
     st.markdown("""- Display total number of pages after receiving the correct input""")
     st.markdown("""- Display the result with sentences containing them as well as the numerical values in the sentences so that users can extract stats for research or analysis""")
     st.markdown("""- Display the word's time appearance and number of pages it occurs """)
     st.markdown("""- Check legit website links""")
     st.markdown("""- Allow multiple local files to be uploaded""")
+    st.markdown("""- NLP Implementation to your comment to satisfy the client""")
     
     st.write("---")
 
@@ -190,6 +208,94 @@ with searching:
             search = search.lower()
             find_sentence(combined, search)
     
+    st.write("---")
+
+with comment:
+    st.markdown("<h1 style='text-align: left; color: red;'>Comment</h1>", unsafe_allow_html=True)
+    #Load emotion datasets
+    df1 = pd.read_csv(r"C:\Users\Admin\Scraping\emotion_dataset_2.csv")
+    
+    # Data Cleaning
+    dir(nfx)
+    
+    # User Handles
+    df1['Clean Text'] = df1['Text'].apply(nfx.remove_userhandles)
+    
+    # Stopwords
+    df1['Clean Text'] = df1['Clean Text'].apply(nfx.remove_stopwords)
+    
+    # Special Character
+    df1['Clean Text'] = df1['Clean Text'].apply(nfx.remove_special_characters)
+    
+    # Features & Labels
+    Xfearures = df1['Clean Text']
+    ylabels = df1['Emotion']
+    
+    # Split Data
+    x_train, x_test, y_train, y_test = train_test_split(Xfearures, ylabels, test_size=0.3, random_state=42)
+    
+    # Logistic Regression Pipeline
+    pipe_lr = Pipeline(steps=[("cv", CountVectorizer()), ('lr', LogisticRegression())])
+    
+    # Train and Fit Data
+    pipe_lr.fit(x_train, y_train)
+    
+    emotions_emoji_dict = {"anger":"😠","disgust":"🤮", "fear":"😨😱", "happy":"🤗", "joy":"😂", "neutral":"😐", "sad":"😔", "sadness":"😔", "shame":"😳", "surprise":"😮"}
+
+    # Repeat the input until the user is satisfied then stop
+    done = False
+    while not done:
+        #Input the comment
+        exl = st.text_input(
+                "Leave your comment below 👇")
+
+        emotion = pipe_lr.predict([exl])[0]
+        #Emoji representing different emotions
+        emoji_icon = emotions_emoji_dict[emotion]
+        
+        # Make A Prediction
+        st.write("From the comment above, I can see that your emotion is " + emotion + emoji_icon)
+        
+        st.subheader("Here's some statistics from your comment that my NLP system got:")
+        
+        # Check Accuracy
+        st.success("Accuracy")
+        st.write("The accuracy of my NLP estimation of emotion from your comment: " + str(pipe_lr.score(x_test, y_test)))
+        
+        # Average Prediction Probability
+        st.success("Prediction Probability")
+        st.write("The average prediction probability of my NLP estimation of emotion from your comment: " + str(np.average(pipe_lr.predict_proba([exl]))))
+        
+        left1, right1 = st.columns(2)
+        
+        # Table for different emotion probability
+        with left1:
+            st.write("Here's the table and graphical visual for different emotion probability:")
+            proba_df = pd.DataFrame(pipe_lr.predict_proba([exl]), columns=pipe_lr.classes_)
+            
+            # Transpose Dataframe
+            proba_df = proba_df.T
+            
+            #Reset column names
+            proba_df.columns = ["Probability"]
+            st.write(proba_df)
+        
+        # Bar chart for the emotion and probability table
+        with right1:
+            proba_df_clean = proba_df.reset_index()
+            proba_df_clean.columns = ['Emotions', "Probability"]
+            fig = alt.Chart(proba_df_clean).mark_bar().encode(x='Emotions', y = "Probability")
+            st.altair_chart(fig, use_container_width = True)
+        
+        if emotion == "joy" or emotion == 'surprise':
+            st.write("It seems my system works well. I hope you enjoy using it for your work.")
+            done = True
+        else:
+            exl = st.text_input(
+                "Please tell me what I can do to improve the system 👇")
+            if exl !='':
+                st.write('Thank you so much for your feedback. I will try to improve the error ASAP. I wish you a great day and enjoy using my service')
+            done = True
     
     
     
