@@ -4,19 +4,23 @@ import re
 import PyPDF2
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import altair as alt
 
 #NLP library
 import neattext.functions as nfx
 import joblib
 
+#Translation Library
+from mtranslate import translate
+import os
+from gtts import gTTS
+import base64
+
 # ML libraries
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.pipeline import Pipeline
 
 #set website link a name
@@ -212,11 +216,88 @@ with searching:
 
 with comment:
     st.markdown("<h1 style='text-align: left; color: red;'>Comment</h1>", unsafe_allow_html=True)
-    #Load emotion datasets
+    
+    # Load emotion datasets
     df1 = pd.read_csv(r"C:\Users\Admin\Scraping\emotion_dataset_2.csv")
     
-    # Data Cleaning
+    # Load language dataset
+    df2 = pd.read_csv(r"C:\Users\Admin\Scraping\language.csv", encoding= 'unicode_escape')
+    
+    # Emotional Data Cleaning
     dir(nfx)
+    
+    # Language Data Cleaning
+    df2.dropna(inplace=True)
+    lang = df2['name'].to_list()
+    langlist=tuple(lang)
+    langcode = df2['iso'].to_list()
+    
+    choice = st.sidebar.radio('SELECT LANGUAGE',langlist)
+
+    speech_langs = {
+        "af": "Afrikaans",
+        "ar": "Arabic",
+        "bg": "Bulgarian",
+        "bn": "Bengali",
+        "bs": "Bosnian",
+        "ca": "Catalan",
+        "cs": "Czech",
+        "cy": "Welsh",
+        "da": "Danish",
+        "de": "German",
+        "el": "Greek",
+        "en": "English",
+        "eo": "Esperanto",
+        "es": "Spanish",
+        "et": "Estonian",
+        "fi": "Finnish",
+        "fr": "French",
+        "gu": "Gujarati",
+        "hi": "Hindi",
+        "hr": "Croatian",
+        "hu": "Hungarian",
+        "hy": "Armenian",
+        "id": "Indonesian",
+        "is": "Icelandic",
+        "it": "Italian",
+        "ja": "Japanese",
+        "jw": "Javanese",
+        "km": "Khmer",
+        "kn": "Kannada",
+        "ko": "Korean",
+        "la": "Latin",
+        "lv": "Latvian",
+        "mk": "Macedonian",
+        "ml": "Malayalam",
+        "mr": "Marathi",
+        "my": "Myanmar (Burmese)",
+        "ne": "Nepali",
+        "nl": "Dutch",
+        "no": "Norwegian",
+        "pl": "Polish",
+        "pt": "Portuguese",
+        "ro": "Romanian",
+        "ru": "Russian",
+        "si": "Sinhala",
+        "sk": "Slovak",
+        "sq": "Albanian",
+        "sr": "Serbian",
+        "su": "Sundanese",
+        "sv": "Swedish",
+        "sw": "Swahili",
+        "ta": "Tamil",
+        "te": "Telugu",
+        "th": "Thai",
+        "tl": "Filipino",
+        "tr": "Turkish",
+        "uk": "Ukrainian",
+        "ur": "Urdu",
+        "vi": "Vietnamese",
+        "zh-CN": "Chinese"
+    }
+    
+    # create dictionary of language and 2 letter langcode
+    lang_array = {lang[i]: langcode[i] for i in range(len(langcode))}
     
     # User Handles
     df1['Clean Text'] = df1['Text'].apply(nfx.remove_userhandles)
@@ -296,6 +377,37 @@ with comment:
             if exl !='':
                 st.write('Thank you so much for your feedback. I will try to improve the error ASAP. I wish you a great day and enjoy using my service')
             done = True
+    
+    # function to decode audio file for download
+    def get_binary_file_downloader_html(bin_file, file_label='File'):
+        with open(bin_file, 'rb') as f:
+            data = f.read()
+        bin_str = base64.b64encode(data).decode()
+        href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
+        return href
+    
+    c1,c2 = st.columns([4,4])
+
+    # I/O
+    if len(exl) > 0 :
+        try:
+            output = translate(exl,lang_array[choice])
+            with c1:
+                st.markdown("<h1 style='text-align: left; color: red;'>NLP Translation for more application.</h1>", unsafe_allow_html=True)
+                st.text_area("TRANSLATED TEXT",output,height=200)
+            # if speech support is available will render autio file
+            if choice in speech_langs.values():
+                with c2:
+                    aud_file = gTTS(text=output, lang=lang_array[choice], slow=False)
+                    aud_file.save("lang.mp3")
+                    audio_file_read = open('lang.mp3', 'rb')
+                    audio_bytes = audio_file_read.read()
+                    bin_str = base64.b64encode(audio_bytes).decode()
+                    st.audio(audio_bytes, format='audio/mp3')
+                    st.markdown(get_binary_file_downloader_html("lang.mp3", 'Audio File'), unsafe_allow_html=True)
+        except Exception as e:
+            st.error(e)
+    
     
     
     
