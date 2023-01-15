@@ -5,12 +5,13 @@ import PyPDF2
 import pandas as pd
 import numpy as np
 import altair as alt
+import uuid
 
-#NLP library
+#NLP Sentiment Analysis library
 import neattext.functions as nfx
 import joblib
 
-#Translation Library
+#NLP Translation Library
 from mtranslate import translate
 import os
 from gtts import gTTS
@@ -217,14 +218,8 @@ with searching:
 with comment:
     st.markdown("<h1 style='text-align: left; color: red;'>Comment</h1>", unsafe_allow_html=True)
     
-    # Load emotion datasets
-    df1 = pd.read_csv(r"C:\Users\Admin\Scraping\emotion_dataset_2.csv")
-    
     # Load language dataset
     df2 = pd.read_csv(r"C:\Users\Admin\Scraping\language.csv", encoding= 'unicode_escape')
-    
-    # Emotional Data Cleaning
-    dir(nfx)
     
     # Language Data Cleaning
     df2.dropna(inplace=True)
@@ -296,8 +291,14 @@ with comment:
         "zh-CN": "Chinese"
     }
     
-    # create dictionary of language and 2 letter langcode
+    # Create dictionary of language and 2 letter langcode
     lang_array = {lang[i]: langcode[i] for i in range(len(langcode))}
+    
+    # Load emotion datasets
+    df1 = pd.read_csv(r"C:\Users\Admin\Scraping\emotion_dataset_2.csv")
+    
+    # Emotional Data Cleaning
+    dir(nfx)
     
     # User Handles
     df1['Clean Text'] = df1['Text'].apply(nfx.remove_userhandles)
@@ -329,13 +330,48 @@ with comment:
         #Input the comment
         exl = st.text_input(
                 "Leave your comment below 👇")
-
+        
         emotion = pipe_lr.predict([exl])[0]
         #Emoji representing different emotions
         emoji_icon = emotions_emoji_dict[emotion]
         
         # Make A Prediction
         st.write("From the comment above, I can see that your emotion is " + emotion + emoji_icon)
+        
+        # Function to decode audio file for download
+        def get_binary_file_downloader_html(bin_file, file_label='File'):
+            with open(bin_file, 'rb') as f:
+                data = f.read()
+            bin_str = base64.b64encode(data).decode()
+            href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
+            return href
+        
+        # Translation Function
+        def translation(c1, c2,exl):
+            # Generate random unique key id to avoid the st.text_area error
+            key = str(uuid.uuid1())
+            
+            if len(exl) > 0 :
+                try:
+                    output = translate(exl,lang_array[choice])
+                    with c1:
+                        st.markdown("<h1 style='text-align: left; color: red;'>NLP Translation for more application.</h1>", unsafe_allow_html=True)
+                        st.text_area("TRANSLATED TEXT",output,height=200, key=key)
+                    # if speech support is available will render autio file
+                    if choice in speech_langs.values():
+                        with c2:
+                            aud_file = gTTS(text=output, lang=lang_array[choice], slow=False)
+                            aud_file.save("lang.mp3")
+                            audio_file_read = open('lang.mp3', 'rb')
+                            audio_bytes = audio_file_read.read()
+                            bin_str = base64.b64encode(audio_bytes).decode()
+                            st.audio(audio_bytes, format='audio/mp3')
+                            st.markdown(get_binary_file_downloader_html("lang.mp3", 'Audio File'), unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(e)
+        
+        c1, c2 = st.columns(2)
+        translation(c1,c2,exl)
         
         st.subheader("Here's some statistics from your comment that my NLP system got:")
         
@@ -374,39 +410,13 @@ with comment:
         else:
             exl = st.text_input(
                 "Please tell me what I can do to improve the system 👇")
+            
+            c3, c4 = st.columns(2)
+            translation(c3,c4,exl)
+            
             if exl !='':
                 st.write('Thank you so much for your feedback. I will try to improve the error ASAP. I wish you a great day and enjoy using my service')
             done = True
-    
-    # function to decode audio file for download
-    def get_binary_file_downloader_html(bin_file, file_label='File'):
-        with open(bin_file, 'rb') as f:
-            data = f.read()
-        bin_str = base64.b64encode(data).decode()
-        href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
-        return href
-    
-    c1,c2 = st.columns([4,4])
-
-    # I/O
-    if len(exl) > 0 :
-        try:
-            output = translate(exl,lang_array[choice])
-            with c1:
-                st.markdown("<h1 style='text-align: left; color: red;'>NLP Translation for more application.</h1>", unsafe_allow_html=True)
-                st.text_area("TRANSLATED TEXT",output,height=200)
-            # if speech support is available will render autio file
-            if choice in speech_langs.values():
-                with c2:
-                    aud_file = gTTS(text=output, lang=lang_array[choice], slow=False)
-                    aud_file.save("lang.mp3")
-                    audio_file_read = open('lang.mp3', 'rb')
-                    audio_bytes = audio_file_read.read()
-                    bin_str = base64.b64encode(audio_bytes).decode()
-                    st.audio(audio_bytes, format='audio/mp3')
-                    st.markdown(get_binary_file_downloader_html("lang.mp3", 'Audio File'), unsafe_allow_html=True)
-        except Exception as e:
-            st.error(e)
     
     
     
